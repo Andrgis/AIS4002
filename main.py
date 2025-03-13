@@ -6,6 +6,7 @@ from pyTorching import generateData
 
 
 
+
 # Define the neural network architecture (must match training)
 class InverseKinematicsModel(nn.Module):
     def __init__(self):
