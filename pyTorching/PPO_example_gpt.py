@@ -1,8 +1,10 @@
 import gymnasium as gym
+from gymnasium.envs.classic_control.cartpole import CartPoleEnv
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+
 if not hasattr(np, 'bool8'):
     np.bool8 = np.bool_
 
@@ -14,6 +16,26 @@ EPOCHS = 10  # Number of training epochs per update
 BATCH_SIZE = 64  # Minibatch size for updates
 UPDATE_INTERVAL = 2000  # Steps before updating policy
 TAU = 0.95  # GAE smoothing factor
+
+
+class CustomCartPoleEnv(CartPoleEnv):
+    def __init__(self):
+        super().__init__()
+        self.length = 0.7  # Modify pole length
+        self.masscart = 1.5  # Modify cart mass
+        # Add more customizations as needed
+
+
+# Register the new environment
+gym.envs.registration.register(
+    id='CustomCartPole-v0',
+    entry_point="__main__:CustomCartPoleEnv",
+    max_episode_steps=500,
+    reward_threshold=475.0,
+)
+
+# Use the customized environment
+env = gym.make('CustomCartPole-v0')
 
 
 # Actor-Critic Network
@@ -135,11 +157,11 @@ class PPOAgent:
 
 
 # Run PPO on CartPole-v1
-env = gym.make("CartPole-v1")
+#env = gym.make("CartPole-v1")
 agent = PPOAgent(env)
-n_train = 1500
+n_train = 200
 agent.train(n_train)
 
 # After training is complete
-torch.save(agent.model.state_dict(), f"ppo_agent_{n_train}.pth")
+torch.save(agent.model.state_dict(), f"ppo_agent_cust_{n_train}.pth")
 print("Agent saved!")

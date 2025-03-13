@@ -2,7 +2,7 @@ import gymnasium as gym
 import torch
 import torch.nn as nn
 import numpy as np
-
+from PPO_example_gpt import CustomCartPoleEnv
 
 # Make sure the network architecture is identical to the one used during training.
 class ActorCritic(nn.Module):
@@ -26,11 +26,11 @@ action_dim = 2  # For CartPole-v1, action space has 2 discrete actions.
 model = ActorCritic(state_dim, action_dim)
 
 # Load saved parameters.
-model.load_state_dict(torch.load("ppo_agent_1500.pth", map_location=torch.device('cpu')))
+model.load_state_dict(torch.load("ppo_agent_cust_200.pth", map_location=torch.device('cpu')))
 model.eval()  # Set to evaluation mode.
 
 # Create the environment with rendering enabled.
-env = gym.make("CartPole-v1", render_mode="human")
+env = gym.make("CustomCartPole-v0")#, render_mode="human")
 state, _ = env.reset()
 
 done = False
