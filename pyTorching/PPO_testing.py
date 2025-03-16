@@ -28,7 +28,7 @@ for _ in range(100):
     model = ActorCritic(state_dim, action_dim)
 
     # Load saved parameters.
-    model.load_state_dict(torch.load(f"ppo_agent_swingup_{n_train}.pth", map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load(f"ppo_agents/ppo_agent_swingup_{n_train}.pth", map_location=torch.device('cpu')))
     model.eval()  # Set to evaluation mode.
 
     # Create the environment with rendering enabled.

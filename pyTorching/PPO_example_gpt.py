@@ -184,7 +184,7 @@ class PPOAgent:
 # Run PPO on CartPole-v1
 #env = gym.make("CartPole-v1")
 agent = PPOAgent(env)
-n_train = 150
+n_train = 8
 agent.train(n_train)
 
 plt.plot(range(len(agent.reward_memory)), agent.reward_memory)
@@ -195,5 +195,6 @@ plt.show()
 
 
 # After training is complete
-torch.save(agent.model.state_dict(), f"ppo_agent_swingup_{n_train}.pth")
+
+torch.save(agent.model.state_dict(), f"ppo_agents/ppo_agent_swingup_{n_train}.pth")
 print("Agent saved!")
