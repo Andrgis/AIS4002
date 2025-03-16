@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import matplotlib.pyplot as plt
 
 if not hasattr(np, 'bool8'):
     np.bool8 = np.bool_
@@ -12,25 +13,47 @@ if not hasattr(np, 'bool8'):
 GAMMA = 0.99  # Discount factor
 LR = 3e-4  # Learning rate
 EPSILON = 0.2  # Clipping parameter for PPO
-EPOCHS = 10  # Number of training epochs per update
+EPOCHS = 8  # Number of training epochs per update
 BATCH_SIZE = 64  # Minibatch size for updates
 UPDATE_INTERVAL = 2000  # Steps before updating policy
 TAU = 0.95  # GAE smoothing factor
 
 
 class CustomCartPoleEnv(CartPoleEnv):
-    def __init__(self):
-        super().__init__()
-        self.length = 0.7  # Modify pole length
-        self.masscart = 1.5  # Modify cart mass
+    def __init__(self, render_mode=None):
+        super().__init__(render_mode=render_mode)
+        #self.length = 0.7  # Modify pole length
+        #self.masscart = 1.5  # Modify cart mass
         # Add more customizations as needed
+        # Remove the angle threshold by setting it to infinity.
+        self.theta_threshold_radians = float('inf')
+        self.x_threshold = 5.0
+        self.screen_width = 900
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        # Initialize with the pole hanging down (e.g., pi radians away from upright)
+        self.state = np.array([0.0, 0.0, np.pi, 0.0])
+        return self.state, {}
+
+    def step(self, action):
+        state, reward, terminated, truncated, info = super().step(action)
+        # For example, reward the agent based on the pole's angle:
+        # (cos(theta) is 1 when upright and -1 when hanging down)
+        # Unpack state: [cart position, cart velocity, pole angle, pole angular velocity]
+        x, x_dot, theta, theta_dot = state
+        terminated = bool(x < -self.x_threshold or x > self.x_threshold)
+        #reward = -(1*theta**2 + 0.1*theta_dot**2 + 0.001*x**2 + 0.0001*x_dot**2)  # scales reward to [0,1]
+        reward = (0.5 + np.cos(theta)*0.5) - 0.003*theta_dot**2 - 100*terminated
+        # Optionally, modify termination criteria if needed
+        return state, reward, terminated, truncated, info
 
 
 # Register the new environment
 gym.envs.registration.register(
     id='CustomCartPole-v0',
-    entry_point="__main__:CustomCartPoleEnv",
-    max_episode_steps=500,
+    entry_point="PPO_example_gpt:CustomCartPoleEnv",  #"__main__:CustomCartPoleEnv",
+    max_episode_steps=400,
     reward_threshold=475.0,
 )
 
@@ -64,6 +87,7 @@ class PPOAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=LR)
 
         self.memory = []  # Stores trajectory data
+        self.reward_memory = []
 
     def select_action(self, state):
         state = torch.FloatTensor(state).to(self.device)
@@ -152,6 +176,7 @@ class PPOAgent:
                     break
 
             # Update the policy every UPDATE_INTERVAL steps
+            self.reward_memory.append(episode_reward)
             self.update_policy()
             print(f"Episode {episode + 1}: Reward = {episode_reward}")
 
@@ -159,9 +184,16 @@ class PPOAgent:
 # Run PPO on CartPole-v1
 #env = gym.make("CartPole-v1")
 agent = PPOAgent(env)
-n_train = 200
+n_train = 150
 agent.train(n_train)
 
+plt.plot(range(len(agent.reward_memory)), agent.reward_memory)
+plt.grid()
+plt.xlabel("# Episodes")
+plt.ylabel("Reward")
+plt.show()
+
+
 # After training is complete
-torch.save(agent.model.state_dict(), f"ppo_agent_cust_{n_train}.pth")
+torch.save(agent.model.state_dict(), f"ppo_agent_swingup_{n_train}.pth")
 print("Agent saved!")
