@@ -19,13 +19,13 @@ env = DummyVecEnv([lambda: env])
 model = PPO('MlpPolicy', env, verbose=1)
 
 # Set total timesteps.
-total_timesteps = 40000  # adjust as needed
+total_timesteps = 300000  # adjust as needed
 
 # Train the agent.
 model.learn(total_timesteps=total_timesteps)
 
 # Save the trained model.
-model.save(f"ppo_agents/ppo_cartpole_hybrid_ts{total_timesteps//1000}k")
+model.save(f"ppo_agents/ppo_cartpole_pure_rcos_wp_ts{total_timesteps//1000}k")
 
 print("Training complete, model saved!")
 

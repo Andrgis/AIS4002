@@ -18,7 +18,7 @@ polemass_length = m_p * l_com
 Er = 0.015      # Reference energy (J)
 ke = 5         # Gain for swingup
 u_max = 2.5     # Maximum acceleration [m/s^2]
-balance_range = 20.0  # Degrees: within this range, use balance mode
+balance_range = 180.0  # Degrees: within this range, use balance mode
 
 # Control loop parameter for integration
 dt = 0.02  # timestep (s)
@@ -54,6 +54,7 @@ class CustomCartPoleEnv(CartPoleEnv):
         self.state = None
 
         self.iu = 0
+        self.top_reached = False
 
         # Define a continuous action space (e.g., acceleration in m/s^2)
         self.action_space = spaces.Discrete(9)
@@ -94,6 +95,9 @@ class CustomCartPoleEnv(CartPoleEnv):
         # Convert pole angle to degrees for mode switching
         theta_deg = math.degrees((theta + math.pi) % (2*math.pi) - math.pi)
 
+        if not self.top_reached:
+            self.top_reached = abs(theta_deg) < 5.0
+
         # Determine control mode:
         if abs(theta_deg) > balance_range:
             # Swing-up mode: use physics-based swingup to get acceleration
@@ -106,7 +110,7 @@ class CustomCartPoleEnv(CartPoleEnv):
             #u = np.clip(action, -1.0, 1.0) * u_max
             u = acceleration_map[action]
             self.iu += 1
-            print(f"Agent: {u}")
+            #print(f"Agent control: {u}")
 
 
         # Now, compute dynamics.
@@ -136,12 +140,17 @@ class CustomCartPoleEnv(CartPoleEnv):
             done = True'''
         # Define reward: you could reward based on how close the pole is to upright.
         # For example, reward = 1 when pole is perfectly upright (theta ~ 0).
-        #reward = (0.5 + 0.5 * np.cos(theta)) #- 0.002 * theta_dot**2
-        reward = np.clip(2-2*abs(theta_deg)/balance_range, 0, 1)
+
+        if self.top_reached:
+            reward = np.cos(theta) - 0.002 * theta_dot**2
+        else:
+            reward = (0.5 + 0.5 * np.cos(theta)) - 0.002 * theta_dot**2
+
+        '''reward = np.clip(2-2*abs(theta_deg)/balance_range, 0, 1)
         if abs(theta_deg) < balance_range:
             reward -= 0.01 * abs(theta_dot)
         #else:
-        #    reward -= 0.3
+        #    reward -= 0.3'''
         if done:
             reward -= 10
 
@@ -156,7 +165,7 @@ class CustomCartPoleEnv(CartPoleEnv):
 gym.envs.registration.register(
     id='CustomCartPole-v1',
     entry_point="pendulum_physics:CustomCartPoleEnv", #"__main__:CustomCartPoleEnv",
-    max_episode_steps=400,
+    max_episode_steps=200,
     reward_threshold=475.0,
 )
 
