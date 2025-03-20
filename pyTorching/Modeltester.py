@@ -6,20 +6,20 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from pendulum_physics import CustomCartPoleEnv
 
 # Load the trained model
-model = PPO.load("ppo_agents/ppo_cartpole_pure_rcos_wp_ts300k.zip")
+model = PPO.load("ppo_agents/ppo_cartpole_pure_simple_ts500k.zip")
 
 # Test the trained model
 env = gym.make('CustomCartPole-v1', render_mode="human")
 env = DummyVecEnv([lambda: env])
 obs = env.reset()
 total_reward = 0
-for _ in range(400):
+for _ in range(1200):
     action, _states = model.predict(obs)
     obs, rewards, dones, info = env.step(action)
     env.render("human")
     total_reward += rewards[0]
     print(rewards)
-    sleep(0.05)
+    sleep(0.01)
 print("Episode finished with total reward:", total_reward)
 
 env.close()

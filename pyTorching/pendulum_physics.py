@@ -6,7 +6,7 @@ from gymnasium import spaces
 
 # Physical parameters (from your simulation)
 m_p = 0.1       # Pole mass [kg]
-m_c = 0.01       # Cart mass [kg] (you can adjust)
+m_c = 1.0       # Cart mass [kg] (you can adjust)
 l = 0.095       # Pole length [m]
 l_com = l / 2   # Distance to center of mass of pole
 J = (1/3) * m_p * l * l  # Inertia of the pole [kg*m^2]
@@ -26,20 +26,6 @@ dt = 0.02  # timestep (s)
 # Global variables for swingup function (for simplicity, you may want to store these in the env)
 prevAngle = 0.0
 
-def swingup_acceleration(angle: float) -> np.ndarray:
-    """Compute acceleration for swingup mode based on the current angle."""
-    global prevAngle
-    angularV = (angle - prevAngle) / dt
-    prevAngle = angle
-
-    # Total energy of the pendulum
-    E = 0.5 * J * angularV**2 + m_p * g * l_com * (1 - np.cos(angle))
-    # Limit energy difference
-    E_diff = np.clip(E - Er, -Er, Er)
-    u = ke * E_diff * (-angularV * np.cos(angle))
-    u_sat = np.clip(u, -u_max, u_max)
-    return u_sat
-
 class CustomCartPoleEnv(CartPoleEnv):
     def __init__(self, render_mode=None):
         # Call parent with render_mode (must be accepted)
@@ -53,17 +39,20 @@ class CustomCartPoleEnv(CartPoleEnv):
         # The state is [x, x_dot, theta, theta_dot]
         self.state = None
 
-        self.iu = 0
-        self.top_reached = False
+        self.observation_space = spaces.Box(
+            low=np.array([-self.x_threshold, -np.inf, -np.pi, -np.inf], dtype=np.float32),
+            high=np.array([self.x_threshold, np.inf, np.pi, np.inf], dtype=np.float32),
+            dtype=np.float32
+        )
 
         # Define a continuous action space (e.g., acceleration in m/s^2)
-        self.action_space = spaces.Discrete(9)
+        self.action_space = spaces.Discrete(2)
         #self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         # Start with the pole hanging down (theta = pi)
-        self.state = np.array([0.0, 0.0, 0.8*np.pi, 0.0])
+        self.state = np.array([0.0, 0.0, 3.1, 0.0], dtype=np.float32)
         # Reset global swingup variable
         global prevAngle
         prevAngle = self.state[2]
@@ -76,17 +65,7 @@ class CustomCartPoleEnv(CartPoleEnv):
           - If within the balance_range, use the agent’s control input (assumed to be a continuous acceleration value).
         """
         # Map discrete actions to acceleration values.
-        acceleration_map = {
-            0: -2.5,
-            1: -1.25,
-            2: 0.0,
-            3: 1.25,
-            4: 2.5,
-            5: 3.75,
-            6: 5.0,
-            7: -3.75,
-            8: -5.0
-        }
+        acceleration_map = {0: -2.5, 1: 2.5}
         applied_acc = acceleration_map[action]
 
         # Unpack current state
@@ -95,26 +74,11 @@ class CustomCartPoleEnv(CartPoleEnv):
         # Convert pole angle to degrees for mode switching
         theta_deg = math.degrees((theta + math.pi) % (2*math.pi) - math.pi)
 
-        if not self.top_reached:
-            self.top_reached = abs(theta_deg) < 5.0
-
-        # Determine control mode:
-        if abs(theta_deg) > balance_range:
-            # Swing-up mode: use physics-based swingup to get acceleration
-            u = swingup_acceleration(theta)
-            #print(f"Swing-up: {u}")
-        else:
-            # Balance mode: agent provides acceleration (action)
-            # Here we assume the agent's action is a scalar in [-1,1] and scale it to the physical limits.
-            # You may choose to tune this scaling.
-            #u = np.clip(action, -1.0, 1.0) * u_max
-            u = acceleration_map[action]
-            self.iu += 1
-            #print(f"Agent control: {u}")
+        # Agent provides acceleration (action)
+        u = acceleration_map[action]
 
 
         # Now, compute dynamics.
-        # Instead of calling super().step, we integrate our own equations.
         # Using the equations similar to CartPole but replacing force with m_c * u.
         force = m_c * u  # force = mass_cart * acceleration
 
@@ -123,34 +87,23 @@ class CustomCartPoleEnv(CartPoleEnv):
         sintheta = np.sin(theta)
 
         temp = (force + polemass_length * theta_dot**2 * sintheta) / total_mass
-        thetaacc = (g * sintheta - costheta * temp) / (l * (4.0/3.0 - m_p * costheta**2 / total_mass)) - 0.5*theta_dot
+        thetaacc = (g * sintheta - costheta * temp) / (l * (4.0/3.0 - m_p * costheta**2 / total_mass)) - 0.05*theta_dot
         xacc = temp - polemass_length * thetaacc * costheta / total_mass
 
         # Update state using Euler integration
         x = x + dt * x_dot
         x_dot = x_dot + dt * xacc
         theta = theta + dt * theta_dot
+        theta = (theta + np.pi) % (2 * np.pi) - np.pi  # Normalize angle to [-pi, pi]
         theta_dot = theta_dot + dt * thetaacc
 
-        self.state = np.array([x, x_dot, theta, theta_dot])
+        self.state = np.array([x, x_dot, theta, theta_dot], dtype=np.float32)  # Ensure float32
 
         # Termination: Only if cart goes out of bounds
         done = bool(x < -self.x_threshold or x > self.x_threshold)
-        '''if abs(theta_deg) > 90 and self.iu > 10:
-            done = True'''
-        # Define reward: you could reward based on how close the pole is to upright.
-        # For example, reward = 1 when pole is perfectly upright (theta ~ 0).
 
-        if self.top_reached:
-            reward = np.cos(theta) - 0.002 * theta_dot**2
-        else:
-            reward = (0.5 + 0.5 * np.cos(theta)) - 0.002 * theta_dot**2
+        reward = (0.5 + 0.5 * np.cos(theta))**2 - 0.002 * theta_dot**2
 
-        '''reward = np.clip(2-2*abs(theta_deg)/balance_range, 0, 1)
-        if abs(theta_deg) < balance_range:
-            reward -= 0.01 * abs(theta_dot)
-        #else:
-        #    reward -= 0.3'''
         if done:
             reward -= 10
 
@@ -165,7 +118,7 @@ class CustomCartPoleEnv(CartPoleEnv):
 gym.envs.registration.register(
     id='CustomCartPole-v1',
     entry_point="pendulum_physics:CustomCartPoleEnv", #"__main__:CustomCartPoleEnv",
-    max_episode_steps=200,
+    max_episode_steps=400,
     reward_threshold=475.0,
 )
 
@@ -175,12 +128,13 @@ if __name__ == '__main__':
     state, _ = env.reset()
     total_reward = 0
     done = False
+    print(env.observation_space)
     while not done:
         # For testing, we can use a simple heuristic action (here, 0, not used in swingup mode)
         action = 0.0
         state, reward, done, truncated, info = env.step(action)
         total_reward += reward
-        print(reward)
+        print(state)
         env.render()
     env.close()
     print("Episode finished with total reward:", total_reward)
