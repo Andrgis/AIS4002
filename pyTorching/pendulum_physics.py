@@ -6,7 +6,7 @@ from gymnasium import spaces
 
 # Physical parameters (from your simulation)
 m_p = 0.1       # Pole mass [kg]
-m_c = 1.0       # Cart mass [kg] (you can adjust)
+m_c = 0.1       # Cart mass [kg] (you can adjust)
 l = 0.095       # Pole length [m]
 l_com = l / 2   # Distance to center of mass of pole
 J = (1/3) * m_p * l * l  # Inertia of the pole [kg*m^2]

@@ -9,7 +9,7 @@ env = gym.make('CustomCartPole-v1', render_mode=None)
 env = DummyVecEnv([lambda: env])
 
 # Path to the saved model
-modelnum = 400000  # Change as needed
+modelnum = 500000  # Change as needed
 model_path = f"ppo_agents/ppo_cartpole_pure_simple_ts{modelnum//1000}k.zip"  # Change to the actual saved file
 
 # Try to load an existing model if available
@@ -25,7 +25,7 @@ additional_timesteps = 100000  # Change as needed
 model.learn(total_timesteps=additional_timesteps)
 
 # Save the updated model
-new_model_path = f"ppo_agents/ppo_cartpole_pure_simple_ts{(modelnum + additional_timesteps) // 1000}k"
+new_model_path = f"ppo_agents/ppo_cartpole_m01_simple_ts{(modelnum + additional_timesteps) // 1000}k"
 model.save(new_model_path)
 
 print(f"Training complete, model saved to {new_model_path}!")
